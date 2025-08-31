@@ -3,6 +3,7 @@
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_BOARDS, CREATE_BOARD } from '@/graphql/boards';
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function BoardsPage() {
     const { data, loading, error } = useQuery(GET_BOARDS); // runs automatically when component mounts
@@ -28,7 +29,9 @@ export default function BoardsPage() {
             <ul >
                 {data?.boards?.map((b: any) => (
                     <li key={b.id} className='p-2 bg-gray-400 border-2 rounded-md mb-2'>
-                        {b.name} (pos {b.position})
+                        <Link href={`/boards/${b.id}`}>
+                            {b.name}
+                        </Link>
                     </li>
                 ))}
             </ul>
