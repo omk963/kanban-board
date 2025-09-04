@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@apollo/client";
-import { CREATE_CARD, GET_COLUMN } from "@/graphql";
+import { CREATE_CARD, UPDATE_CARD, GET_COLUMN } from "@/graphql";
 import dynamic from "next/dynamic";
 import {
     Dialog,
@@ -16,46 +16,64 @@ import { Button } from "@/components/ui/button";
 // dynamically load markdown editor (client-only)
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
-export default function CardForm({ columnId }: any) {
-    const { data, loading, error } = useQuery(GET_COLUMN, { variables: { id: columnId } });
-    const [open, setOpen] = useState(false);
-    const [title, setTitle] = useState("");
-    const [description, setDescription] = useState<string | undefined>("");
+export default function CardForm({ columnId, card, open, onClose }: any) {
+    const { data } = useQuery(GET_COLUMN, { variables: { id: columnId } });
+    const [title, setTitle] = useState(card?.title || "");
+    const [description, setDescription] = useState<string | undefined>(card?.description || "");
     const [createCard] = useMutation(CREATE_CARD, {
         refetchQueries: [GET_COLUMN]
     });
+    const [updateCard] = useMutation(UPDATE_CARD, {
+        refetchQueries: [GET_COLUMN]
+    });
 
-    if (loading) return <p>Loading...</p>;
-    if (error) return <p>Error: {error.message}</p>;
+    // preload card values when editing
+    useEffect(() => {
+        if (card) {
+            setTitle(card.title);
+            setDescription(card.description || "");
+        }
+        else {
+            setTitle("");
+            setDescription("");
+        }
+    }, [card, open])
+
     console.log(data, data?.columns_by_pk?.cards?.length)
 
     async function handleSubmit() {
         if (!title.trim()) return;
-        const position = (data?.columns_by_pk?.cards?.length || 0) + 1;
-        await createCard({
-            variables: {
-                column_id: columnId,
-                title,
-                description,
-                position
-            },
-        });
 
-        setTitle("");
-        setDescription("");
-        setOpen(false);
+        if (card) {
+            // update existing card
+            await updateCard({
+                variables: {
+                    id: card.id,
+                    title,
+                    description
+                }
+            })
+        } else {
+            // create new card
+            const position = (data?.columns_by_pk?.cards?.length || 0) + 1;
+            await createCard({
+                variables: {
+                    column_id: columnId,
+                    title,
+                    description,
+                    position
+                },
+            });
+        }
+
+        onClose();
     }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button variant="outline" className="w-full mt-2">
-                    ➕ Add Card
-                </Button>
-            </DialogTrigger>
+        <Dialog open={open} onOpenChange={onClose}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Create a New Card</DialogTitle>
+                    <DialogTitle>{card ? "Edit Card" : "Create a New Card"}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4">
@@ -77,7 +95,7 @@ export default function CardForm({ columnId }: any) {
                     </div>
 
                     <Button onClick={handleSubmit} className="w-full">
-                        Create
+                        {card ? "Save Changes" : "Create"}
                     </Button>
                 </div>
             </DialogContent>
